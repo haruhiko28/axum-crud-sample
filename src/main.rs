@@ -1,5 +1,5 @@
 // response::Jsonを追加
-use axum::{extract::State, response::Json, routing::get, Router};
+use axum::{extract::State, response::Json, routing::{get, patch}, Router};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -56,6 +56,10 @@ async fn post_user(
         Json(users_lock.clone())
     }
 
+async fn patch_user(
+    State(users_state): State<Arc<Mutex<Users>>>,
+)
+
 // 非同期のmain関数を実行できるようにする
 #[tokio::main]
 async fn main() {
@@ -89,6 +93,7 @@ async fn main() {
     let app = Router::new()
                         .route("/users",get(get_users).post(post_user))
                         .route("/", get(root_handler))
+                        .route("/users/:user_id", patch(patch_user))
                         .with_state(users_state);
 
 
