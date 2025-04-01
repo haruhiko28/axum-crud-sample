@@ -1,5 +1,5 @@
 // response::Jsonを追加
-use axum::{extract::State, response::Json, routing::{get, patch}, Router};
+use axum::{extract::{Path, State}, response::Json, routing::{get, patch}, Router};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -58,7 +58,51 @@ async fn post_user(
 
 async fn patch_user(
     State(users_state): State<Arc<Mutex<Users>>>,
-)
+    // URLから受け取る
+    Path(user_id): Path<u32>,
+    Json(update_user): Json<CreateUser>,
+    // Resultを返り値に指定
+    ) -> Result<Json<User>, String> {
+    
+    let mut users_lock = users_state.lock().await;
+
+    // findの返り値がSome(user)であった場合のみ処理
+    if let Some(user) = users_lock.users.iter_mut().find(|user| user.id == user_id) {
+
+        // 名前を更新
+        user.name = update_user.name.clone();
+
+        // 値をOkに包んで返す
+        return Ok(Json(user.clone()));
+    }
+
+    // idを持つuserが密じゃらなかったらErr()として返す
+    Err("User not found".to_string())
+
+}
+
+async fn delete_user(
+    State(users_state): State<Arc<Mutex<Users>>>,
+    Path(user_id): Path<u32>,
+    ) -> Result<Json<Users>, String> {
+    
+    let mut users_lock = users_state.lock().await;
+
+    // 更新前のusersの長さを保持
+    let original_len = users_lock.users.len();
+
+    // retainを使って、指定したIDのユーザを削除
+    users_lock.users.retain(|user| user.id != user_id) ;
+
+    //usersの長さが変わっていれば、削除に成功している
+    if users_lock.users.len() == original_len {
+        Err("User not found".to_string())
+    } else {
+        Ok(Json(users_lock.clone()))
+    }
+}
+
+
 
 // 非同期のmain関数を実行できるようにする
 #[tokio::main]
@@ -93,7 +137,7 @@ async fn main() {
     let app = Router::new()
                         .route("/users",get(get_users).post(post_user))
                         .route("/", get(root_handler))
-                        .route("/users/:user_id", patch(patch_user))
+                        .route("/users/:user_id", patch(patch_user).delete(delete_user))
                         .with_state(users_state);
 
 
