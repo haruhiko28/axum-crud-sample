@@ -3,6 +3,7 @@ use axum::{extract::{Path, State}, response::Json, routing::{get, patch}, Router
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
 // JSONファイルのやりとりを可能にする
 #[derive(Clone, Deserialize, Serialize)]
@@ -102,7 +103,33 @@ async fn delete_user(
     }
 }
 
+/// Database object encapsulating the connection pool and providing convenience functions.
+struct Database {
+    pool: SqlitePool,
+}
 
+impl Database {
+    pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        let db_options = SqliteConnectOptions::from_str(":memory:")?
+            .create_if_missing(true)
+            .disable_statement_logging()
+            .to_owned();
+
+        let pool = SqlitePoolOptions::new().connect_with(db_options).await?;
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS posts (
+                id INTEGER PRIMARY KEY,
+                title TEXT NOT NULL,
+                content NOT NULL
+            );",
+        )
+        .execute(&pool)
+        .await?;
+
+        Ok(Self { pool })
+    }
+}
 
 // 非同期のmain関数を実行できるようにする
 #[tokio::main]
