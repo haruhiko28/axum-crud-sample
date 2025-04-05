@@ -3,20 +3,24 @@ use axum::{extract::{Path, State}, response::Json, routing::{get, patch}, Router
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
+use sqlx::{sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions}, types::chrono};
+use std::env;
 
 // JSONファイルのやりとりを可能にする
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Debug)]
 // 構造体を定義
 struct User {
-    id: u32,
-    name: String,
+    pub id: i64,
+    pub name: String,
+    pub email: String,
+    pub address: Option<String>,
+    pub created_at: chrono::NaiveDate,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
-struct Users {
-    users: Vec<User>,
-}
+// #[derive(Clone, Deserialize, Serialize)]
+// struct Users {
+//     users: Vec<User>,
+// }
 
 #[derive(Clone, Deserialize, Serialize)]
 struct CreateUser {
@@ -139,22 +143,30 @@ async fn main() {
         "Hello World".to_string()
     }
 
-    let users = Users {
-        users: vec![
-            User {
-                id: 1,
-                name: "takashi".to_string(),
-            },
-            User {
-                id: 2,
-                name: "hitoshi".to_string(),
-            },
-            User {
-                id: 3,
-                name: "masashi".to_string(),
-            },
-        ],
-    };
+    // let users = Users {
+    //     users: vec![
+    //         User {
+    //             id: 1,
+    //             name: "takashi".to_string(),
+    //         },
+    //         User {
+    //             id: 2,
+    //             name: "hitoshi".to_string(),
+    //         },
+    //         User {
+    //             id: 3,
+    //             name: "masashi".to_string(),
+    //         },
+    //     ],
+    // };
+    dotenv::dotenv().expect("Failed to read .env file");
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let pool = SqlitePool::connect(&database_url).await;
+    let users = sqlx::query_as!(
+        User,
+        "select id, name, email, address, created_at from users"
+    ).fetch_all(&pool)
+    .await;
 
     // Mutexにusersを包む。MutexをArcで包むのはイディオムのようなもの
     let users_state = Arc::new(Mutex::new(users));
