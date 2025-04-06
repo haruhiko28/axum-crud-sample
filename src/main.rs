@@ -162,11 +162,7 @@ async fn main() {
     dotenv::dotenv().expect("Failed to read .env file");
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool = SqlitePool::connect(&database_url).await;
-    let users = sqlx::query_as!(
-        User,
-        "select id, name, email, address, created_at from users"
-    ).fetch_all(&pool)
-    .await;
+    let users = sqlx::query("select id, name, email, address, created_at from users").execute(&pool).await;
 
     // Mutexにusersを包む。MutexをArcで包むのはイディオムのようなもの
     let users_state = Arc::new(Mutex::new(users));
