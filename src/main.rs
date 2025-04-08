@@ -1,9 +1,9 @@
 // response::Jsonを追加
-use axum::{extract::{Path, State}, response::Json, routing::{get, patch}, Router};
+use axum::{extract::State, response::Json, routing::{get}, Router};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use sqlx::{sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions}, types::chrono};
+use sqlx::{sqlite::SqlitePool, types::chrono};
 use std::env;
 
 // JSONファイルのやりとりを可能にする
@@ -17,10 +17,10 @@ struct User {
     pub created_at: chrono::NaiveDate,
 }
 
-// #[derive(Clone, Deserialize, Serialize)]
-// struct Users {
-//     users: Vec<User>,
-// }
+#[derive(Clone)]
+struct Users<'a> {
+    users: &'a Vec<User>,
+}
 
 #[derive(Clone, Deserialize, Serialize)]
 struct CreateUser {
@@ -29,12 +29,20 @@ struct CreateUser {
 
 // Readを行う関数
 // usersを取得、Json<Users>を返り値として指定
-// async fn get_users(State(users_state): State<Arc<Mutex<Users>>>) -> Json<Users> {
-//     // ロックを獲得
-//     let user_lock = users_state.lock().await;
-//     // usersを返す
-//     Json(user_lock.clone())
-// }
+async fn get_users(State(users_state): State<Arc<Mutex<Users>>>) -> Json<Users> {
+    // ロックを獲得
+    let user_lock = users_state.lock().await;
+    let mut vec = Vec::new();
+    // usersを返す
+    for user in &user_lock.users {
+        vec.push(user);
+    }
+    let test_user = Users {
+        users: vec,
+    };
+
+    Json(test_user.clone())
+}
 
 // Createを行う関数
 // async fn post_user(
@@ -174,19 +182,21 @@ async fn main() -> Result<(), sqlx::Error> {
     }
 
     // Mutexにusersを包む。MutexをArcで包むのはイディオムのようなもの
-    // let users_state = Arc::new(Mutex::new(users));
+    let users_state = Arc::new(Mutex::new(users));
 
     // ルートを定義
     // "/"を踏むと、上で定義したroot_handlerを実行する
     // let app = Router::new()
-    //                     .route("/users",get(get_users).post(post_user))
-    //                     .route("/", get(root_handler))
-    //                     // .route("/users/:user_id", patch(patch_user).delete(delete_user))
-    //                     .with_state(users_state);
+                        // .route("/users",get(get_users).post(post_user))
+                        // .route("/users",get(get_users))
 
+    //                     .route("/", get(root_handler))
+                        // .route("/users/:user_id", patch(patch_user).delete(delete_user))
+                        // .with_state(users_state);
+    let app = Router::new().route("/users",get(get_users)).with_state(users_state);;
 
     // 指定したポートにサーバを開く
-    // let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    // axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
     Ok(())
 }
