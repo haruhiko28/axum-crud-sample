@@ -1,26 +1,35 @@
 // response::Jsonを追加
-use axum::{extract::State, response::Json, routing::{get}, Router};
-use serde::{Deserialize, Serialize};
+use axum::{http::StatusCode, extract::Query,extract::State, response::Json, routing::get, Extension, Router, response::IntoResponse};
+use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use sqlx::{sqlite::SqlitePool, types::chrono};
 use std::env;
 
 // JSONファイルのやりとりを可能にする
-#[derive(Debug)]
-// 構造体を定義
+#[derive(Serialize)]
 struct User {
     pub id: i64,
     pub name: String,
     pub email: String,
     pub address: Option<String>,
-    pub created_at: chrono::NaiveDate,
+    // pub created_at: chrono::NaiveDate,
 }
 
-#[derive(Clone)]
-struct Users<'a> {
-    users: &'a Vec<User>,
+#[derive(Deserialize)]
+struct UserQuery {
+    id: i64,
 }
+
+async fn users_handler(Query(query):Query<UserQuery>, Extension(pool):Extension<Arc<SqlitePool>>) -> impl IntoResponse {
+    let selected_user_id = query.id;
+    match sqlx::query_as!(User, "select id, name, email, address from users where id = ?", selected_user_id).fetch_optional(&*pool).await {
+        Ok(user) => (StatusCode::OK, Json(user)),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(None::<User>)),
+    }
+}
+
+
 
 #[derive(Clone, Deserialize, Serialize)]
 struct CreateUser {
@@ -29,20 +38,20 @@ struct CreateUser {
 
 // Readを行う関数
 // usersを取得、Json<Users>を返り値として指定
-async fn get_users(State(users_state): State<Arc<Mutex<Users>>>) -> Json<Users> {
-    // ロックを獲得
-    let user_lock = users_state.lock().await;
-    let mut vec = Vec::new();
-    // usersを返す
-    for user in &user_lock.users {
-        vec.push(user);
-    }
-    let test_user = Users {
-        users: vec,
-    };
+// async fn get_users(State(users_state): State<Arc<Mutex<Users>>>) -> Json<Users> {
+//     // ロックを獲得
+//     let user_lock = users_state.lock().await;
+//     let mut vec = Vec::new();
+//     // usersを返す
+//     for user in &user_lock.users {
+//         vec.push(user);
+//     }
+//     let test_user = Users {
+//         users: vec,
+//     };
 
-    Json(test_user.clone())
-}
+//     Json(test_user.clone())
+// }
 
 // Createを行う関数
 // async fn post_user(
@@ -168,21 +177,13 @@ async fn main() -> Result<(), sqlx::Error> {
     //     ],
     // };
     dotenv::dotenv().expect("Failed to read .env file");
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let pool = SqlitePool::connect(&database_url).await?;
-    let users = sqlx::query_as!(
-        User,
-        "select id, name, email, address, created_at from users"
-    )
-    .fetch_all(&pool)
-    .await?;
-
-    for user in users {
-        println!("{:?}", user);
-    }
-
+    let key = "DATABASE_URL";
+    let db_url = env::var(key).expect("key not found.");
+    let pool = SqlitePool::connect(&db_url).await.expect("cannot connect.");
+    let shared_pool = Arc::new(pool);
+   
     // Mutexにusersを包む。MutexをArcで包むのはイディオムのようなもの
-    let users_state = Arc::new(Mutex::new(users));
+    // let users_state = Arc::new(Mutex::new(users));
 
     // ルートを定義
     // "/"を踏むと、上で定義したroot_handlerを実行する
@@ -193,7 +194,9 @@ async fn main() -> Result<(), sqlx::Error> {
     //                     .route("/", get(root_handler))
                         // .route("/users/:user_id", patch(patch_user).delete(delete_user))
                         // .with_state(users_state);
-    let app = Router::new().route("/users",get(get_users)).with_state(users_state);;
+    let app = Router::new() 
+        .route("/users", get(users_handler))
+        .layer(Extension(shared_pool));
 
     // 指定したポートにサーバを開く
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
