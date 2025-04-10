@@ -33,25 +33,11 @@ async fn users_handler(Query(query):Query<UserQuery>, Extension(pool):Extension<
 
 #[derive(Clone, Deserialize, Serialize)]
 struct CreateUser {
-    name: String,
+    pub name: String,
+    pub email: String,
+    pub address: Option<String>,
 }
 
-// Readを行う関数
-// usersを取得、Json<Users>を返り値として指定
-// async fn get_users(State(users_state): State<Arc<Mutex<Users>>>) -> Json<Users> {
-//     // ロックを獲得
-//     let user_lock = users_state.lock().await;
-//     let mut vec = Vec::new();
-//     // usersを返す
-//     for user in &user_lock.users {
-//         vec.push(user);
-//     }
-//     let test_user = Users {
-//         users: vec,
-//     };
-
-//     Json(test_user.clone())
-// }
 
 // Createを行う関数
 // async fn post_user(
@@ -160,22 +146,6 @@ async fn main() -> Result<(), sqlx::Error> {
     //     "Hello World".to_string()
     // }
 
-    // let users = Users {
-    //     users: vec![
-    //         User {
-    //             id: 1,
-    //             name: "takashi".to_string(),
-    //         },
-    //         User {
-    //             id: 2,
-    //             name: "hitoshi".to_string(),
-    //         },
-    //         User {
-    //             id: 3,
-    //             name: "masashi".to_string(),
-    //         },
-    //     ],
-    // };
     dotenv::dotenv().expect("Failed to read .env file");
     let key = "DATABASE_URL";
     let db_url = env::var(key).expect("key not found.");
