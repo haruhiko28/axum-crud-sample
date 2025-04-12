@@ -21,7 +21,7 @@ struct UserQuery {
     id: i64,
 }
 
-async fn users_handler(Query(query):Query<UserQuery>, Extension(pool):Extension<Arc<SqlitePool>>) -> impl IntoResponse {
+async fn user_handler(Query(query):Query<UserQuery>, Extension(pool):Extension<Arc<SqlitePool>>) -> impl IntoResponse {
     let selected_user_id = query.id;
     match sqlx::query_as!(User, "select id, name, email, address from users where id = ?", selected_user_id).fetch_optional(&*pool).await {
         Ok(user) => (StatusCode::OK, Json(user)),
@@ -29,7 +29,12 @@ async fn users_handler(Query(query):Query<UserQuery>, Extension(pool):Extension<
     }
 }
 
-
+async fn users_handler(Extension(pool):Extension<Arc<SqlitePool>>) -> impl IntoResponse {
+    match sqlx::query_as!(User, "select id, name, email, address from users").fetch_all(&*pool).await {
+        Ok(users) => (StatusCode::OK, Json(users)),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(None::User)),
+    }
+}
 
 #[derive(Clone, Deserialize, Serialize)]
 struct CreateUser {
@@ -164,8 +169,9 @@ async fn main() -> Result<(), sqlx::Error> {
     //                     .route("/", get(root_handler))
                         // .route("/users/:user_id", patch(patch_user).delete(delete_user))
                         // .with_state(users_state);
-    let app = Router::new() 
+    let app = Router::new()
         .route("/users", get(users_handler))
+        .route("/user", get(user_handler))
         .layer(Extension(shared_pool));
 
     // 指定したポートにサーバを開く
