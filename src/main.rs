@@ -5,9 +5,10 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use sqlx::{sqlite::SqlitePool, types::chrono};
 use std::env;
+use serde_json::json;
 
 // JSONファイルのやりとりを可能にする
-#[derive(Serialize)]
+#[derive(Serialize, sqlx::FromRow)]
 struct User {
     pub id: i64,
     pub name: String,
@@ -30,9 +31,18 @@ async fn user_handler(Query(query):Query<UserQuery>, Extension(pool):Extension<A
 }
 
 async fn users_handler(Extension(pool):Extension<Arc<SqlitePool>>) -> impl IntoResponse {
-    match sqlx::query_as!(User, "select id, name, email, address from users").fetch_all(&*pool).await {
-        Ok(users) => (StatusCode::OK, Json(users)),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(None::User)),
+    match  sqlx::query_as::<_, User>("select id, name, email, address from users")
+        .fetch_all(&*pool)
+        .await {
+            Ok(users) => {
+                let json_users = json!(users); // Vec<User> を JSON に変換
+                (StatusCode::OK, Json(json_users))
+            }
+            Err(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            ),
+    // return (StatusCode::OK, Json(users));
     }
 }
 
