@@ -31,7 +31,7 @@ async fn user_handler(Query(query):Query<UserQuery>, Extension(pool):Extension<A
 }
 
 async fn users_handler(Extension(pool):Extension<Arc<SqlitePool>>) -> impl IntoResponse {
-    match  sqlx::query_as::<_, User>("select id, name, email, address from users")
+    match  sqlx::query_as::<_, User>("select * from users")
         .fetch_all(&*pool)
         .await {
             Ok(users) => {
