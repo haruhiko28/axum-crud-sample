@@ -46,13 +46,33 @@ async fn users_handler(Extension(pool):Extension<Arc<SqlitePool>>) -> impl IntoR
     }
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Deserialize)]
 struct CreateUser {
-    pub name: String,
-    pub email: String,
-    pub address: Option<String>,
+    name: String,
+    email: String,
 }
 
+#[derive(Serialize)]
+struct InsertResponse {
+    rows_affected: u64,
+}
+
+async fn add_user(Extension(pool):Extension<Arc<SqlitePool>>,Json(post): Json<CreateUser>) -> impl IntoResponse {
+    match sqlx::query!("INSERT INTO users (name, email) VALUES (?,?);",
+    post.name,
+    post.email)
+    .execute(&*pool)
+    .await {
+        Ok(result) => {
+            let response = InsertResponse {
+                rows_affected: result.rows_affected(),
+            };
+            let json_users = json!(response); // Vec<User> を JSON に変換
+            (StatusCode::OK, Json(json_users))
+        },
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
+    }
+}
 
 // Createを行う関数
 // async fn post_user(
@@ -180,7 +200,7 @@ async fn main() -> Result<(), sqlx::Error> {
                         // .route("/users/:user_id", patch(patch_user).delete(delete_user))
                         // .with_state(users_state);
     let app = Router::new()
-        .route("/users", get(users_handler))
+        .route("/users", get(users_handler).post(add_user(j)))
         .route("/user", get(user_handler))
         .layer(Extension(shared_pool));
 
