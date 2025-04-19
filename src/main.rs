@@ -57,7 +57,7 @@ struct InsertResponse {
     rows_affected: u64,
 }
 
-async fn add_user(Extension(pool):Extension<Arc<SqlitePool>>,Json(post): Json<CreateUser>) -> impl IntoResponse {
+async fn add_user(Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<CreateUser>) -> impl IntoResponse {
     match sqlx::query!("INSERT INTO users (name, email) VALUES (?,?);",
     post.name,
     post.email)
@@ -200,7 +200,7 @@ async fn main() -> Result<(), sqlx::Error> {
                         // .route("/users/:user_id", patch(patch_user).delete(delete_user))
                         // .with_state(users_state);
     let app = Router::new()
-        .route("/users", get(users_handler).post(add_user(j)))
+        .route("/users", get(users_handler).post(add_user))
         .route("/user", get(user_handler))
         .layer(Extension(shared_pool));
 
