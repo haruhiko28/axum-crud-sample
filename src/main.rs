@@ -57,6 +57,15 @@ struct InsertResponse {
     rows_affected: u64,
 }
 
+#[derive(Deserialize)]
+pub struct UpdateUser {
+    name: String,
+    email: String,
+    // pub address: Option<String>,
+}
+
+
+
 async fn add_user(Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<CreateUser>) -> impl IntoResponse {
     match sqlx::query!("INSERT INTO users (name, email) VALUES (?,?);",
     post.name,
@@ -73,6 +82,26 @@ async fn add_user(Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<C
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
     }
 }
+
+async fn patch_user(Query(query):Query<UserQuery>,Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<UpdateUser>) -> impl IntoResponse {
+    let selected_user_id: i64 = query.id;
+    match sqlx::query!("UPDATE users SET name = ? email = ? where id = ?;",
+        post.name,
+        post.email,
+        selected_user_id)
+        .execute(&*pool)
+        .await {
+            Ok(result) => {
+                let response = InsertResponse {
+                    rows_affected: result.rows_affected(),
+                };
+                let json_users = json!(response); // Vec<User> を JSON に変換
+                (StatusCode::OK, Json(json_users))
+            },
+            Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
+    }
+}
+
 
 // Createを行う関数
 // async fn post_user(
