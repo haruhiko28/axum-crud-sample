@@ -85,7 +85,7 @@ async fn add_user(Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<C
 
 async fn patch_user(Query(query):Query<UserQuery>,Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<UpdateUser>) -> impl IntoResponse {
     let selected_user_id: i64 = query.id;
-    match sqlx::query!("UPDATE users SET name = ? email = ? where id = ?;",
+    match sqlx::query!("UPDATE users SET name = ?, email = ? where id = ?;",
         post.name,
         post.email,
         selected_user_id)
