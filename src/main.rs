@@ -1,5 +1,5 @@
 // response::Jsonを追加
-use axum::{http::StatusCode, extract::Query,extract::State, response::Json, routing::get, Extension, Router, response::IntoResponse};
+use axum::{http::StatusCode, extract::Query,extract::Path, response::Json, routing::get,routing::patch, Extension, Router, response::IntoResponse};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -83,12 +83,12 @@ async fn add_user(Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<C
     }
 }
 
-async fn patch_user(Query(query):Query<UserQuery>,Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<UpdateUser>) -> impl IntoResponse {
-    let selected_user_id: i64 = query.id;
+async fn patch_user(Path(user_id): Path<u32>, Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<UpdateUser>) -> impl IntoResponse {
+    // let selected_user_id: i64 = query.id;
     match sqlx::query!("UPDATE users SET name = ?, email = ? where id = ?;",
         post.name,
         post.email,
-        selected_user_id)
+        user_id)
         .execute(&*pool)
         .await {
             Ok(result) => {
@@ -231,6 +231,7 @@ async fn main() -> Result<(), sqlx::Error> {
     let app = Router::new()
         .route("/users", get(users_handler).post(add_user))
         .route("/user", get(user_handler))
+        .route("/users/:user_id", patch(patch_user))
         .layer(Extension(shared_pool));
 
     // 指定したポートにサーバを開く
