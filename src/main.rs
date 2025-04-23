@@ -101,6 +101,9 @@ async fn patch_user(Path(user_id): Path<u32>, Extension(pool):Extension<Arc<Sqli
             Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
     }
 }
+async fn patch_user(Path(user_id): Path<u32>, Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<UpdateUser>) -> impl IntoResponse {
+    match sqlx::query!("DELETE users SET name = ?, email = ? where id = ?;",   
+}
 
 
 // Createを行う関数
