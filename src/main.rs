@@ -101,8 +101,20 @@ async fn patch_user(Path(user_id): Path<u32>, Extension(pool):Extension<Arc<Sqli
             Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
     }
 }
-async fn patch_user(Path(user_id): Path<u32>, Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<UpdateUser>) -> impl IntoResponse {
-    match sqlx::query!("DELETE users SET name = ?, email = ? where id = ?;",   
+async fn delete_user(Path(user_id): Path<u32>, Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<UpdateUser>) -> impl IntoResponse {
+    match sqlx::query!("DELETE FROM users where id = ?;", 
+        user_id)
+        .execute(&*pool)
+        .await {
+            Ok(result) => {
+                let response = InsertResponse {
+                    rows_affected: result.rows_affected(),
+                };
+                let json_users = json!(response); // Vec<User> を JSON に変換
+                (StatusCode::OK, Json(json_users))
+            },
+            Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))
+        }
 }
 
 
@@ -234,7 +246,7 @@ async fn main() -> Result<(), sqlx::Error> {
     let app = Router::new()
         .route("/users", get(users_handler).post(add_user))
         .route("/user", get(user_handler))
-        .route("/users/:user_id", patch(patch_user))
+        .route("/users/:user_id", patch(patch_user).delete(delete_user))
         .layer(Extension(shared_pool));
 
     // 指定したポートにサーバを開く
