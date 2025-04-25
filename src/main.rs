@@ -61,10 +61,7 @@ struct InsertResponse {
 pub struct UpdateUser {
     name: String,
     email: String,
-    // pub address: Option<String>,
 }
-
-
 
 async fn add_user(Extension(pool):Extension<Arc<SqlitePool>>, Json(post): Json<CreateUser>) -> impl IntoResponse {
     match sqlx::query!("INSERT INTO users (name, email) VALUES (?,?);",
@@ -120,10 +117,6 @@ async fn delete_user(Path(user_id): Path<u32>, Extension(pool):Extension<Arc<Sql
 // 非同期のmain関数を実行できるようにする
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
-    // Hello Worldと返すハンドラーを定義
-    // async fn root_handler() -> String {
-    //     "Hello World".to_string()
-    // }
 
     dotenv::dotenv().expect("Failed to read .env file");
     let key = "DATABASE_URL";
@@ -131,18 +124,6 @@ async fn main() -> Result<(), sqlx::Error> {
     let pool = SqlitePool::connect(&db_url).await.expect("cannot connect.");
     let shared_pool = Arc::new(pool);
    
-    // Mutexにusersを包む。MutexをArcで包むのはイディオムのようなもの
-    // let users_state = Arc::new(Mutex::new(users));
-
-    // ルートを定義
-    // "/"を踏むと、上で定義したroot_handlerを実行する
-    // let app = Router::new()
-                        // .route("/users",get(get_users).post(post_user))
-                        // .route("/users",get(get_users))
-
-    //                     .route("/", get(root_handler))
-                        // .route("/users/:user_id", patch(patch_user).delete(delete_user))
-                        // .with_state(users_state);
     let app = Router::new()
         .route("/users", get(users_handler).post(add_user))
         .route("/user", get(user_handler))
